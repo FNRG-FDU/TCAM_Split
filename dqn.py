@@ -16,6 +16,7 @@ class DQN(nn.Module):
         self.in_channels = in_channels
         self.grain = grain
         self.Tanh = nn.Tanh()
+        self.ReLU = nn.ReLU()
 
         self.convs = nn.ModuleList()
         self.out_channels = in_channels
@@ -33,23 +34,19 @@ class DQN(nn.Module):
         for layer in self.convs:
             layer.weight.data = fanin_init(layer.weight.data.size(), init_w, device=self.device)
             layer.bias.data = fanin_init(layer.bias.data.size(), init_w, device=self.device)
+        self.fc.weight.data = fanin_init(self.fc.weight.data.size(), init_w, device=self.device)
+        self.fc.bias.data = fanin_init(self.fc.bias.data.size(), init_w, device=self.device)
 
     def forward(self, x: torch.Tensor):
-
         # conv layers
         for layer in self.convs:
-            print(x.shape)
             x = layer(x)
             x = self.Tanh(x)
-
         # full connected layers
-        x = x.view(-1, self.out_channels)
+        out_channels = self.out_channels
+        x = x.view(-1, out_channels)
         x = self.fc(x)
-        print(x.shape)
-
-
-
-
+        x = self.Tanh(x)
         return x
 
 
@@ -123,7 +120,7 @@ class DQNEnvironment(Environment):
         :param rule: the rule need to be processed
         :return: reward
         """
-        return -self.tcams[action].insert(rule)
+        return 1 / self.tcams[action].insert(rule)
 
 
     def get_state(self, cur_rule: Rule):
