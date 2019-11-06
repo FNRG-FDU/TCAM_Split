@@ -21,7 +21,7 @@ class DQN(nn.Module):
         while grain > 1:
             grain = (grain - 1) // 2
             convs.append(nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=3))
-            convs.append(nn.ReLU())
+            # convs.append(nn.ReLU()) #todo
             in_channels = out_channels
             out_channels = out_channels + 1
         self.convs = nn.Sequential(*convs)
@@ -67,6 +67,7 @@ class DQNAgent(Agent):
             state_a = np.array([state], copy=False)  # make state vector become a state matrix
             state_v = torch.tensor(state_a, dtype=torch.float, device=self.device)  # transfer to tensor class
             self.net.eval()
+            print(state_v)
             q_vals_v = self.net(state_v)  # input to network, and get output
             _, act_v = torch.max(q_vals_v, dim=1)  # get the max index
             action_index = int(act_v.item())  # returns the value of this tensor as a standard Python number. This only works for tensors with one element.

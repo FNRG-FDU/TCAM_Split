@@ -21,21 +21,23 @@ LEARNING_RATE = 1e-3
 SYNC_INTERVAL = 5
 ACTION_SPACE = generate_action_space(num_TCAM=num_TCAM)
 IN_CHANNELS = num_TCAM + 1
-DEVICE = torch.device("cuda")
+DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-# create decision maker(agent) & optimizer & environment
-net = DQN(device=DEVICE)
-tgt_net = DQN(device=DEVICE)
+# create TCAMs
+tcams = [TCAM() for i in range(num_TCAM)]
+
+# create net and target net
+net = DQN(in_channels=IN_CHANNELS, grain=GRAIN, action_space=ACTION_SPACE, device=DEVICE)
+tgt_net = DQN(in_channels=IN_CHANNELS, grain=GRAIN, action_space=ACTION_SPACE, device=DEVICE)
 buffer = ExperienceBuffer(capacity=REPLAY_SIZE)
 
+# create optim and environment
 optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
-env = DQNEnvironment()
+agent = DQNAgent(net=net, tgt_net=tgt_net, buffer=buffer, action_space=ACTION_SPACE, gamma=GAMMA, epsilon_start=EPSILON_START, epsilon=EPSILON, epsilon_final=EPSILON_FINAL, epsilon_decay=EPSILON_DECAY, device=DEVICE)
+env = DQNEnvironment(tcams=tcams, grain=grain)
 
 
 rules = read_rules("./data/acl1.txt")
-tcams = [TCAM() for i in range(num_TCAM)]
-
-
 
 
 # related
@@ -49,31 +51,23 @@ if __name__ == "__main__":
     # deploy sfcs / handle each time slot
     for i in range(len(rules)):
         idx += 1
-        state = env.get_state(model, i)
-        decision = deploy_sfc_item(model, i, decision_maker, cur_time, state, test_env)
-                action = DQNAction(decision.active_server, decision.standby_server).get_action()
-                reward = env.get_reward(model, i, decision, test_env)
-                next_state = env.get_state(model, i)
+        state = env.get_state(rules[i])
+        action = agent.generate_decision(state)
+        reward = env.step(action, rules[i])
+        next_state = env.get_state(rules[i])
+        exp =  Experience(state=state, action=action, reward=reward, new_state=next_state)
+        agent.buffer.append(exp)
 
-                exp =  Experience(state=state, action=action, reward=reward, new_state=next_state)
-                decision_maker.buffer.append(exp)
+        if len(agent.buffer) < REPLAY_SIZE:
+            continue
 
-                if len(decision_maker.buffer) < REPLAY_SIZE:
-                    continue
+        if idx % SYNC_INTERVAL == 0:
+            agent.tgt_net.load_state_dict(agent.net.state_dict())
 
-                if idx % SYNC_INTERVAL == 0:
-                    decision_maker.tgt_net.load_state_dict(decision_maker.net.state_dict())
+        optimizer.zero_grad()
+        batch = agent.buffer.sample(BATCH_SIZE)
+        loss_t = calc_loss(batch, agent.net, agent.tgt_net, gamma=GAMMA, action_space=ACTION_SPACE, device=DEVICE)
+        loss_t.backward()
+        optimizer.step()
 
-                optimizer.zero_grad()
-                batch = decision_maker.buffer.sample(BATCH_SIZE)
-                loss_t = calc_loss(batch, decision_maker.net, decision_maker.tgt_net, gamma=GAMMA, action_space=ACTION_SPACE, device=DEVICE)
-                loss_t.backward()
-                optimizer.step()
 
-    Monitor.print_log()
-
-    # model.print_start_and_down()
-
-    print(model.calculate_fail_rate())
-
-    print(model.calculate_accept_rate())
