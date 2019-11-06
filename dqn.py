@@ -15,17 +15,18 @@ class DQN(nn.Module):
         self.device = device
         self.in_channels = in_channels
         self.grain = grain
+        self.Tanh = nn.Tanh()
 
-        convs = []
-        out_channels = in_channels + 1
+        self.convs = nn.ModuleList()
+        self.out_channels = in_channels
         while grain > 1:
+            self.out_channels += 1
             grain = (grain - 1) // 2
-            convs.append(nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=3))
+            self.convs.append(nn.Conv2d(in_channels=in_channels, out_channels=self.out_channels, kernel_size=3, stride=2))
             # convs.append(nn.ReLU()) #todo
-            in_channels = out_channels
-            out_channels = out_channels + 1
-        self.convs = nn.Sequential(*convs)
+            in_channels = self.out_channels
 
+        self.fc = nn.Linear(self.out_channels, len(self.action_space))
         self.init_weights(3e2)
 
     def init_weights(self, init_w):
@@ -34,8 +35,20 @@ class DQN(nn.Module):
             layer.bias.data = fanin_init(layer.bias.data.size(), init_w, device=self.device)
 
     def forward(self, x: torch.Tensor):
-        x = self.convs(x)
-        print(x)
+
+        # conv layers
+        for layer in self.convs:
+            print(x.shape)
+            x = layer(x)
+            x = self.Tanh(x)
+
+        # full connected layers
+        x = x.view(-1, self.out_channels)
+        x = self.fc(x)
+        print(x.shape)
+
+
+
 
         return x
 
@@ -67,7 +80,6 @@ class DQNAgent(Agent):
             state_a = np.array([state], copy=False)  # make state vector become a state matrix
             state_v = torch.tensor(state_a, dtype=torch.float, device=self.device)  # transfer to tensor class
             self.net.eval()
-            print(state_v)
             q_vals_v = self.net(state_v)  # input to network, and get output
             _, act_v = torch.max(q_vals_v, dim=1)  # get the max index
             action_index = int(act_v.item())  # returns the value of this tensor as a standard Python number. This only works for tensors with one element.

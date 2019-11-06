@@ -20,7 +20,7 @@ EPSILON_DECAY = 1000 #todo
 LEARNING_RATE = 1e-3
 SYNC_INTERVAL = 5
 ACTION_SPACE = generate_action_space(num_TCAM=num_TCAM)
-IN_CHANNELS = num_TCAM + 1
+IN_CHANNELS = num_TCAM
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 # create TCAMs
