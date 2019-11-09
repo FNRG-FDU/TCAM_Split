@@ -3,24 +3,25 @@ import torch.optim as optim
 from dqn import *
 
 # parameters with problem
-GRAIN = 16
+GRAIN = grain
 num_TCAM = 4
 
 # parameters with rl
-GAMMA = 0.95
-BATCH_SIZE = 200
+GAMMA = 1
+BATCH_SIZE = 50 # todo
 
 ACTION_SHAPE = num_TCAM
-REPLAY_SIZE = 10000
+REPLAY_SIZE = 200 # todo
 EPSILON = 0.0
 EPSILON_START = 1.0
 EPSILON_FINAL = 0.02
-EPSILON_DECAY = 500
+EPSILON_DECAY = 3000
 LEARNING_RATE = 1e-3
-SYNC_INTERVAL = 5
+SYNC_INTERVAL = 3
 ACTION_SPACE = generate_action_space(num_TCAM=num_TCAM)
 IN_CHANNELS = num_TCAM
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+DEVICE = torch.device("cpu")
 
 # create TCAMs
 tcams = [TCAM() for i in range(num_TCAM)]
@@ -62,24 +63,25 @@ if __name__ == "__main__":
 
         if i == REPLAY_SIZE:
             total_move = 0
-            for tcam in tcams:
-                total_move += tcam.move
-            print(total_move)
+            for i in range(len(tcams)):
+                print("TCAM #{}: current rules num: {}, current move num: {}.".format(i, tcams[i].cur_num, tcams[i].move))
+                total_move += tcams[i].move
+            print("Total move: {}".format(total_move))
 
         if idx % SYNC_INTERVAL == 0:
             agent.tgt_net.load_state_dict(agent.net.state_dict())
 
         optimizer.zero_grad()
         batch = agent.buffer.sample(BATCH_SIZE)
-        loss_t = calc_loss(batch, agent.net, agent.tgt_net, gamma=GAMMA, action_space=ACTION_SPACE, device=DEVICE)
+        loss_t = calc_loss(batch, agent.net, agent.tgt_net, gamma=GAMMA, device=DEVICE)
         loss_t.backward()
         optimizer.step()
 
     # total moves
     total_move = 0
-    for tcam in tcams:
-        print(tcam.cur_num)
-        total_move += tcam.move
-    print(total_move)
+    for i in range(len(tcams)):
+        print("TCAM #{}: current rules num: {}, current move num: {}.".format(i, tcams[i].cur_num, tcams[i].move))
+        total_move += tcams[i].move
+    print("Total move: {}".format(total_move))
 
 

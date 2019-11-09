@@ -3,6 +3,7 @@ import random
 from typing import List
 from utils import *
 
+
 @unique
 class Space(Enum):
     Unlimit = 0
@@ -21,10 +22,9 @@ class DQN(nn.Module):
         self.convs = nn.ModuleList()
         self.out_channels = in_channels
         while grain > 1:
-            self.out_channels += 1
+            self.out_channels *= 2
             grain = (grain - 1) // 2
             self.convs.append(nn.Conv2d(in_channels=in_channels, out_channels=self.out_channels, kernel_size=3, stride=2))
-            # convs.append(nn.ReLU()) #todo
             in_channels = self.out_channels
 
         self.fc = nn.Linear(self.out_channels, len(self.action_space))
@@ -41,12 +41,11 @@ class DQN(nn.Module):
         # conv layers
         for layer in self.convs:
             x = layer(x)
-            x = self.Tanh(x)
+            x = self.ReLU(x)
         # full connected layers
-        out_channels = self.out_channels
-        x = x.view(-1, out_channels)
+        x = x.view(-1, self.out_channels)
         x = self.fc(x)
-        x = self.Tanh(x)
+        x = self.ReLU(x)
         return x
 
 
@@ -86,13 +85,10 @@ class DQNAgent(Agent):
         return action
 
 
-
-
-def calc_loss(batch, net, tgt_net, gamma: float, action_space: List, device: torch.device):
+def calc_loss(batch, net, tgt_net, gamma: float, device: torch.device):
     states, actions, rewards, next_states = batch
 
     # transform each action to index(real action)
-
     states_v = torch.tensor(states, dtype=torch.float).to(device)
     next_states_v = torch.tensor(next_states, dtype=torch.float).to(device)
     actions_v = torch.tensor(actions, dtype=torch.long).to(device)
@@ -121,7 +117,6 @@ class DQNEnvironment(Environment):
         :return: reward
         """
         return 1 / self.tcams[action].insert(rule)
-
 
     def get_state(self, cur_rule: Rule):
         """
@@ -157,4 +152,3 @@ class DQNEnvironment(Environment):
                 overlap_metrix[i][j] = 0 if rule_metrix[i][j] == 0 else overlap_metrix[i][j]
 
         return overlap_metrix
-
