@@ -17,7 +17,7 @@ class Tcam:
         self.rule_set = []  # 存储规则本身
         self.graph = []  # 存储规则序号
         self.ram = []  # 存储规则序号，模拟TCAM结构
-        self.state = []
+        self.state = [0, 0, 0, 0, 0, 0]
 
     def overlap(self, r1, r2):
         if max(r1.src[0], r2.src[0]) > min(r1.src[1], r2.src[1]):
@@ -64,34 +64,29 @@ class Tcam:
         [uaddr, daddr] = self.build(r)
         self._insert(uaddr, daddr, self.cur_num)
 
+        self.state[0] = (self.state[0] * (self.cur_num - 1) + r.src[1] - r.src[0])/self.cur_num
+        self.state[1] = (self.state[1] * (self.cur_num - 1) + r.dst[1] - r.dst[0]) / self.cur_num
+        self.state[2] = (self.state[2] * (self.cur_num - 1) + (r.src[1] + r.src[0])/2) / self.cur_num
+        self.state[3] = (self.state[3] * (self.cur_num - 1) + (r.dst[1] + r.dst[0])/2) / self.cur_num
+        self.state[4] = (self.state[4] * (self.cur_num - 1) + r.prio) / self.cur_num
+        self.state[5] = self.cur_num
+
         return self.move - a
 
     def get_state(self, r):
-        # 状态各维度含义：[（被依赖规则部分）平均长度，平均宽度，平均x0，平均y0，平均优先级，规则数，（当前规则）长度，宽度，x0，y0，优先级，（依赖规则部分）平均长度，平均宽度，平均x0，平均y0，平均优先级，规则数，]
-        up = [0, 0, 0, 0, 0, 0]
+        # 状态各维度含义：[（当前TCAM）平均长度，平均宽度，平均x0，平均y0，平均优先级，规则数，（被依赖规则部分）规则数，（依赖规则部分）规则数，]
         cnu = 0
-        down = [0, 0, 0, 0, 0, 0]
         cnd = 0
         for i in range(0, len(self.graph)):
             if self.overlap(self.rule_set[i], r):
                 if self.rule_set[i].prio > r.prio:
                     cnd += 1
-                    down[0] = (down[0]*(cnd-1) + self.rule_set[i].src[1] - self.rule_set[i].src[0])/cnd
-                    down[1] = (down[1] * (cnd - 1) + self.rule_set[i].dst[1] - self.rule_set[i].dst[0]) / cnd
-                    down[2] = (down[2] * (cnd - 1) + self.rule_set[i].src[0]) / cnd
-                    down[3] = (down[3]*(cnd-1) + self.rule_set[i].dst[0])/cnd
-                    down[4] = (down[4] * (cnd - 1) + self.rule_set[i].prio) / cnd
-                    down[5] = cnd
                 else:
                     cnu += 1
-                    up[0] = (up[0]*(cnu-1) + self.rule_set[i].src[1] - self.rule_set[i].src[0])/cnu
-                    up[1] = (up[1] * (cnu - 1) + self.rule_set[i].dst[1] - self.rule_set[i].dst[0]) / cnu
-                    up[2] = (up[2] * (cnu - 1) + self.rule_set[i].src[0]) / cnu
-                    up[3] = (up[3]*(cnu-1) + self.rule_set[i].dst[0])/cnu
-                    up[4] = (up[4] * (cnu - 1) + self.rule_set[i].prio) / cnu
-                    up[5] = cnu
-        rself = [r.src[1]-r.src[0], r.dst[1] - r.dst[0], r.src[0], r.dst[0], r.prio]
-        return up + rself + down
+        res = self.state[:]
+        res.append(cnd)
+        res.append(cnu)
+        return res
 
 
 if __name__ == "__main__":
@@ -110,6 +105,7 @@ if __name__ == "__main__":
         r = rule_set[i]
         state1 = tcam1.get_state(r)
         state2 = tcam2.get_state(r)
+        state = state1 + state2 + [r.src[1] - r.src[0], r.dst[1] - r.dst[0], (r.src[1]+r.src[0])/2, (r.dst[1]+r.dst[0])/2, r.prio]
         flag = i % 2  # 此处用决策函数替代
         if i == 800:
             c = 1
