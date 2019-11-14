@@ -10,42 +10,54 @@ class Space(Enum):
 
 
 class DQN(nn.Module):
-    def __init__(self, in_channels: int, grain: int, action_space: List, device: torch.device):
+    def __init__(self, state_shape: tuple, action_space: List, device: torch.device):
         super(DQN, self).__init__()
         self.action_space = action_space
         self.device = device
-        self.in_channels = in_channels
-        self.grain = grain
-        self.Tanh = nn.Tanh()
+        self.num_features = state_shape[0]
         self.ReLU = nn.ReLU()
+        self.BNs = nn.ModuleList()
 
-        self.convs = nn.ModuleList()
-        self.out_channels = in_channels
-        while grain > 1:
-            self.out_channels *= 2
-            grain = (grain - 1) // 2
-            self.convs.append(nn.Conv2d(in_channels=in_channels, out_channels=self.out_channels, kernel_size=3, stride=2))
-            in_channels = self.out_channels
+        self.BNs.append(nn.BatchNorm1d(num_features=self.num_features))
+        self.fc1 = nn.Linear(in_features=self.num_features, out_features=5)
+        self.BNs.append(nn.BatchNorm1d(num_features=5))
+        self.fc2 = nn.Linear(in_features=5, out_features=5)
+        self.BNs.append(nn.BatchNorm1d(num_features=5))
+        self.fc3 = nn.Linear(in_features=5, out_features=len(self.action_space))
 
-        self.fc = nn.Linear(self.out_channels, len(self.action_space))
-        self.init_weights(3e2)
+        self.init_weights(3e9)
 
-    def init_weights(self, init_w):
-        for layer in self.convs:
-            layer.weight.data = fanin_init(layer.weight.data.size(), init_w, device=self.device)
-            layer.bias.data = fanin_init(layer.bias.data.size(), init_w, device=self.device)
-        self.fc.weight.data = fanin_init(self.fc.weight.data.size(), init_w, device=self.device)
-        self.fc.bias.data = fanin_init(self.fc.bias.data.size(), init_w, device=self.device)
+    def init_weights(self, init_w: float):
+        for bn in self.BNs:
+            bn.weight.data = fanin_init(bn.weight.data.size(), init_w, device=self.device)
+            bn.bias.data = fanin_init(bn.bias.data.size(), init_w, device=self.device)
+            bn.running_mean.data = fanin_init(bn.running_mean.data.size(), init_w, device=self.device)
+            bn.running_var.data = fanin_init(bn.running_var.data.size(), init_w, device=self.device)
+
+        self.fc1.weight.data = fanin_init(self.fc1.weight.data.size(), init_w, device=self.device)
+        self.fc1.bias.data = fanin_init(self.fc1.bias.data.size(), init_w, device=self.device)
+
+        self.fc2.weight.data = fanin_init(self.fc2.weight.data.size(), init_w, device=self.device)
+        self.fc2.bias.data = fanin_init(self.fc2.bias.data.size(), init_w, device=self.device)
+
+        self.fc3.weight.data = fanin_init(self.fc3.weight.data.size(), init_w, device=self.device)
+        self.fc3.bias.data = fanin_init(self.fc3.bias.data.size(), init_w, device=self.device)
+
 
     def forward(self, x: torch.Tensor):
-        # conv layers
-        for layer in self.convs:
-            x = layer(x)
-            x = self.ReLU(x)
-        # full connected layers
-        x = x.view(-1, self.out_channels)
-        x = self.fc(x)
+        # x = self.BNs[0](x)
+        x = self.fc1(x)
+
         x = self.ReLU(x)
+
+        # x = self.BNs[1](x)
+        x = self.fc2(x)
+        x = self.ReLU(x)
+
+        # x = self.BNs[2](x)
+        x = self.fc3(x)
+        print("output: ", x)
+        # print("outputs: ", outputs)
         return x
 
 
@@ -68,7 +80,17 @@ class DQNAgent(Agent):
         self.gamma = gamma
         self.idx = 0
 
-    def generate_decision(self, state: List):
+    def generate_target_decision(self, state: List):
+        state_a = np.array([state], copy=False)  # make state vector become a state matrix
+        state_v = torch.tensor(state_a, dtype=torch.float, device=self.device)  # transfer to tensor class
+        self.tgt_net.eval()
+        q_vals_v = self.tgt_net(state_v)  # input to network, and get output
+        _, act_v = torch.max(q_vals_v, dim=1)  # get the max index
+        action_index = int(act_v.item())
+        action = self.action_space[action_index]
+        return action
+
+    def generate_sample_decision(self, state: List):
         if np.random.random() < self.epsilon:
             action = random.randint(0, len(self.action_space) - 1)
             action_index = action
@@ -104,10 +126,9 @@ def calc_loss(batch, net, tgt_net, gamma: float, device: torch.device):
 
 
 class DQNEnvironment(Environment):
-    def __init__(self, tcams: List[TCAM], grain: int):
+    def __init__(self, tcams: List[TCAM]):
         super().__init__()
         self.tcams = tcams
-        self.grain = grain
 
     def step(self, action: int, rule: Rule):
         """
@@ -116,7 +137,8 @@ class DQNEnvironment(Environment):
         :param rule: the rule need to be processed
         :return: reward
         """
-        return 1 / self.tcams[action].insert(rule)
+        move = self.tcams[action].insert(rule)
+        return 1 / move
 
     def get_state(self, cur_rule: Rule):
         """
@@ -126,29 +148,6 @@ class DQNEnvironment(Environment):
         """
         state = []
         for tcam in self.tcams:
-            state.append(self.focus(tcam.overlap_metrix, cur_rule))
+            state.extend(tcam.get_state(cur_rule))
+        # state.extend(rself)
         return state
-
-    def focus(self, overlap_metrix: List, rule: Rule):
-        """
-        focus the overlap metrix related to this rule
-        :param overlap_metrix: overlap metrix
-        :param rule: rule
-        :return: metrix processed
-        """
-        rule_metrix = np.zeros((self.grain, self.grain))
-        side = pow(2, 32) / self.grain
-        left = math.floor(rule.src[0] / side)
-        right = math.floor(rule.src[1] / side)
-        down = math.floor(rule.dst[0] / side)
-        up = math.floor(rule.dst[1] / side)
-
-        for i in range(left, right + 1):
-            for j in range(down, up + 1):
-                rule_metrix[i][j] = 1
-
-        for i in range(len(overlap_metrix)):
-            for j in range(len(overlap_metrix[i])):
-                overlap_metrix[i][j] = 0 if rule_metrix[i][j] == 0 else overlap_metrix[i][j]
-
-        return overlap_metrix

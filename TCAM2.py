@@ -10,7 +10,7 @@ class Rule:
         self.taddr = 0
 
 
-class Tcam:
+class TCAM:
     def __init__(self):
         self.cur_num = 0  # 存储当前规则数
         self.move = 0  # 存储当前总移动次数
@@ -83,15 +83,16 @@ class Tcam:
                     cnd += 1
                 else:
                     cnu += 1
-        res = self.state[:]
+        # res = self.state[:]
+        res = []
         res.append(cnd)
         res.append(cnu)
         return res
 
 
 if __name__ == "__main__":
-    tcam1 = Tcam()
-    tcam2 = Tcam()
+    tcam1 = TCAM()
+    tcam2 = TCAM()
 
     rule_set = []
     f = open("./data/fw1.txt")

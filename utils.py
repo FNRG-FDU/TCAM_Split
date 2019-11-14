@@ -3,9 +3,9 @@ import matplotlib.pyplot as plt
 import csv
 import collections
 from ast import literal_eval
-from abc import abstractmethod
 from enum import Enum, unique
-from TCAM import *
+from TCAM2 import *
+
 
 
 class Action:
@@ -75,13 +75,14 @@ def generate_action_space(num_TCAM: int):
     """
     return range(num_TCAM)
 
-def generate_state_shape(grain: int):
+
+def generate_state_shape(*dims):
     """
-    Generate state shape based on grain
+    Generate state shape
     :param grain: grain
     :return: state shape
     """
-    return grain * grain
+    return dims
 
 @unique
 class VariableState(Enum):
