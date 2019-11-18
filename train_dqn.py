@@ -5,11 +5,11 @@ from dqn import *
 
 # parameters with problem
 num_TCAM = 2
-num_features = num_TCAM * 2
+num_features = num_TCAM * 3
 rules_file = "./data/ipc4.txt"
 
 # parameters with rl
-LEARNING_FROM_LAST = True
+LEARNING_FROM_LAST = False
 GAMMA = 0.5
 BATCH_SIZE = 200
 
@@ -17,8 +17,8 @@ REPLAY_SIZE = 1000
 EPSILON = 0.0
 EPSILON_START = 1.0
 EPSILON_FINAL = 0.05
-EPSILON_DECAY = 500
-LEARNING_RATE = 1e-3
+EPSILON_DECAY = 3000
+LEARNING_RATE = 1e-2
 SYNC_INTERVAL = 3
 TRAIN_INTERVAL = 5
 ACTION_SPACE = generate_action_space(num_TCAM=num_TCAM)

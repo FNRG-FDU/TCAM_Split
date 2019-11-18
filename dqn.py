@@ -19,11 +19,11 @@ class DQN(nn.Module):
         self.BNs = nn.ModuleList()
 
         self.BNs.append(nn.BatchNorm1d(num_features=self.num_features))
-        self.fc1 = nn.Linear(in_features=self.num_features, out_features=5)
-        self.BNs.append(nn.BatchNorm1d(num_features=5))
-        self.fc2 = nn.Linear(in_features=5, out_features=5)
-        self.BNs.append(nn.BatchNorm1d(num_features=5))
-        self.fc3 = nn.Linear(in_features=5, out_features=len(self.action_space))
+        self.fc1 = nn.Linear(in_features=self.num_features, out_features=20)
+        self.BNs.append(nn.BatchNorm1d(num_features=20))
+        self.fc2 = nn.Linear(in_features=20, out_features=20)
+        self.BNs.append(nn.BatchNorm1d(num_features=20))
+        self.fc3 = nn.Linear(in_features=20, out_features=len(self.action_space))
 
         self.init_weights(3e9)
 
@@ -116,6 +116,8 @@ def calc_loss(batch, net, tgt_net, gamma: float, device: torch.device):
     actions_v = torch.tensor(actions, dtype=torch.long).to(device)
     rewards_v = torch.tensor(rewards, dtype=torch.float).to(device)
 
+    print("state: ", states_v)
+
     state_action_values = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
     next_state_values = tgt_net(next_states_v).max(1)[0]
     next_state_values = next_state_values.detach()
@@ -138,7 +140,7 @@ class DQNEnvironment(Environment):
         :return: reward
         """
         move = self.tcams[action].insert(rule)
-        return 1 / move
+        return -move
 
     def get_state(self, cur_rule: Rule):
         """
@@ -149,5 +151,5 @@ class DQNEnvironment(Environment):
         state = []
         for tcam in self.tcams:
             state.extend(tcam.get_state(cur_rule))
-        # state.extend(rself)
+        state.extend()
         return state

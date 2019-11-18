@@ -84,7 +84,7 @@ class TCAM:
                 else:
                     cnu += 1
         # res = self.state[:]
-        res = []
+        res = [self.state[5]]
         res.append(cnd)
         res.append(cnu)
         return res
