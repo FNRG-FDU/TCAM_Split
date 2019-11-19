@@ -10,20 +10,22 @@ class Space(Enum):
 
 
 class DQN(nn.Module):
-    def __init__(self, state_shape: tuple, action_space: List, device: torch.device):
+    def __init__(self, state_len: int, action_len: int, device: torch.device):
         super(DQN, self).__init__()
-        self.action_space = action_space
+        self.action_len = action_len
         self.device = device
-        self.num_features = state_shape[0]
+        self.state_len = state_len
+        self.LeakyReLU = nn.LeakyReLU()
         self.ReLU = nn.ReLU()
+        self.Tanh = nn.Tanh()
         self.BNs = nn.ModuleList()
 
-        self.BNs.append(nn.BatchNorm1d(num_features=self.num_features))
-        self.fc1 = nn.Linear(in_features=self.num_features, out_features=20)
+        self.BNs.append(nn.BatchNorm1d(num_features=self.state_len))
+        self.fc1 = nn.Linear(in_features=self.state_len, out_features=20)
         self.BNs.append(nn.BatchNorm1d(num_features=20))
         self.fc2 = nn.Linear(in_features=20, out_features=20)
         self.BNs.append(nn.BatchNorm1d(num_features=20))
-        self.fc3 = nn.Linear(in_features=20, out_features=len(self.action_space))
+        self.fc3 = nn.Linear(in_features=20, out_features=self.action_len)
 
         self.init_weights(3e9)
 
@@ -48,16 +50,17 @@ class DQN(nn.Module):
         # x = self.BNs[0](x)
         x = self.fc1(x)
 
-        x = self.ReLU(x)
+        x = self.LeakyReLU(x)
 
         # x = self.BNs[1](x)
         x = self.fc2(x)
-        x = self.ReLU(x)
+        x = self.LeakyReLU(x)
 
         # x = self.BNs[2](x)
         x = self.fc3(x)
+
         print("output: ", x)
-        # print("outputs: ", outputs)
+
         return x
 
 
@@ -116,8 +119,6 @@ def calc_loss(batch, net, tgt_net, gamma: float, device: torch.device):
     actions_v = torch.tensor(actions, dtype=torch.long).to(device)
     rewards_v = torch.tensor(rewards, dtype=torch.float).to(device)
 
-    print("state: ", states_v)
-
     state_action_values = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
     next_state_values = tgt_net(next_states_v).max(1)[0]
     next_state_values = next_state_values.detach()
@@ -151,5 +152,5 @@ class DQNEnvironment(Environment):
         state = []
         for tcam in self.tcams:
             state.extend(tcam.get_state(cur_rule))
-        state.extend()
+        state.extend([cur_rule.wide, cur_rule.height])
         return state

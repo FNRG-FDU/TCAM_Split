@@ -1,7 +1,6 @@
 from tqdm import tqdm
-import torch.optim as optim
 from dqn import *
-from train_dqn import num_TCAM, num_features, GAMMA, EPSILON, EPSILON_START, EPSILON_FINAL, EPSILON_DECAY, ACTION_SPACE, STATE_SHAPE, TARGET_FILE, rules_file, REPLAY_SIZE
+from train_dqn import num_TCAM, GAMMA, EPSILON, EPSILON_START, EPSILON_FINAL, EPSILON_DECAY, ACTION_SPACE, STATE_LEN, ACTION_LEN, TARGET_FILE, rules_file, REPLAY_SIZE
 
 # parameters with problem
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -10,7 +9,7 @@ DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 tcams = [TCAM() for i in range(num_TCAM)]
 
 # create net and target net
-net = DQN(state_shape=STATE_SHAPE, action_space=ACTION_SPACE, device=DEVICE)
+net = DQN(state_len=STATE_LEN, action_len=ACTION_LEN, device=DEVICE)
 tgt_net = torch.load(TARGET_FILE)
 
 buffer = ExperienceBuffer(capacity=REPLAY_SIZE)

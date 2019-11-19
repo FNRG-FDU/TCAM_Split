@@ -8,6 +8,18 @@ class Rule:
         self.dst = [dst_b, dst_e]
         self.prio = prio
         self.taddr = 0
+        a = self.src[1] - self.src[0] + 1
+        if a != 1:
+            a = math.log2(a)
+        else:
+            a = 0
+        b = self.dst[1] - self.dst[0] + 1
+        if b != 1:
+            b = math.log2(b)
+        else:
+            b = 0
+        self.wide = round(a)
+        self.height = round(b)
 
 
 class TCAM:
@@ -17,7 +29,10 @@ class TCAM:
         self.rule_set = []  # 存储规则本身
         self.graph = []  # 存储规则序号
         self.ram = []  # 存储规则序号，模拟TCAM结构
-        self.state = [0, 0, 0, 0, 0, 0]
+        self.state = []
+        for i in range(0, 33):
+            for j in range(0, 33):
+                self.state.append(0)
 
     def overlap(self, r1, r2):
         if max(r1.src[0], r2.src[0]) > min(r1.src[1], r2.src[1]):
@@ -26,7 +41,7 @@ class TCAM:
             return False
         return True
 
-    def build(self,r):
+    def build(self, r):
         son = []
         uaddr = -1
         daddr = 30000  # 任意大数
@@ -64,12 +79,7 @@ class TCAM:
         [uaddr, daddr] = self.build(r)
         self._insert(uaddr, daddr, self.cur_num)
 
-        self.state[0] = (self.state[0] * (self.cur_num - 1) + r.src[1] - r.src[0])/self.cur_num
-        self.state[1] = (self.state[1] * (self.cur_num - 1) + r.dst[1] - r.dst[0]) / self.cur_num
-        self.state[2] = (self.state[2] * (self.cur_num - 1) + (r.src[1] + r.src[0])/2) / self.cur_num
-        self.state[3] = (self.state[3] * (self.cur_num - 1) + (r.dst[1] + r.dst[0])/2) / self.cur_num
-        self.state[4] = (self.state[4] * (self.cur_num - 1) + r.prio) / self.cur_num
-        self.state[5] = self.cur_num
+        self.state[r.wide*33+r.height] += 1
 
         return self.move - a
 
@@ -83,8 +93,7 @@ class TCAM:
                     cnd += 1
                 else:
                     cnu += 1
-        # res = self.state[:]
-        res = [self.state[5]]
+        res = self.state[:]
         res.append(cnd)
         res.append(cnu)
         return res
@@ -95,18 +104,22 @@ if __name__ == "__main__":
     tcam2 = TCAM()
 
     rule_set = []
-    f = open("./data/fw1.txt")
-    f1 = open("./datares/c-fw1", "w")
+    f = open("./data/acl1.txt")
+    f1 = open("./datares/c-acl1", "w")
     s = f.readlines()
-
+    state = []
     for line in s:
         ss = line.split('  ')
         rule_set.append(Rule(int(ss[0]), int(ss[1]), int(ss[2]), int(ss[3]), int(ss[8])))
     for i in range(0, len(rule_set)):
+
         r = rule_set[i]
         state1 = tcam1.get_state(r)
         state2 = tcam2.get_state(r)
-        state = state1 + state2 + [r.src[1] - r.src[0], r.dst[1] - r.dst[0], (r.src[1]+r.src[0])/2, (r.dst[1]+r.dst[0])/2, r.prio]
+        state = state1 + state2 + [r.wide, r.height]
+        if i == len(rule_set)-1:
+            print(state1)
+            print(state2)
         flag = i % 2  # 此处用决策函数替代
         if i == 800:
             c = 1
@@ -125,4 +138,4 @@ if __name__ == "__main__":
     # print(tcam1.Over_metrix)
     # print(tcam1.Max_metrix)
     # print(tcam1.Min_metrix)
-
+    # print(state)

@@ -75,15 +75,6 @@ def generate_action_space(num_TCAM: int):
     """
     return range(num_TCAM)
 
-
-def generate_state_shape(*dims):
-    """
-    Generate state shape
-    :param grain: grain
-    :return: state shape
-    """
-    return dims
-
 @unique
 class VariableState(Enum):
     Uninitialized = 0
